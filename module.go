@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/hanzoai/zip/internal/jsonenc"
 )
 
 // moduleEnvelope is the JSON shape every extension runtime receives.
 // Same shape across wasm / goja / pyvm / starlark — the host serializes
 // once and the guest sees the same bytes regardless of which engine ran
-// it.
+// it. RawMessage is from encoding/json (v1) because the type lives in
+// v1 only; both v1 and v2 (encoding/json/v2) honor its MarshalJSON /
+// UnmarshalJSON so the envelope serializes identically under either
+// build of jsonenc.
 type moduleEnvelope struct {
 	Method  string            `json:"method"`
 	Path    string            `json:"path"`
@@ -88,7 +93,7 @@ func (a *App) ModuleFn(method, path, fn, runtimeName, modulePath string) error {
 
 	handler := func(c *Ctx) error {
 		env := buildEnvelope(c)
-		payload, err := json.Marshal(env)
+		payload, err := jsonenc.Marshal(env)
 		if err != nil {
 			return ErrInternal("marshal envelope: " + err.Error())
 		}
@@ -98,7 +103,7 @@ func (a *App) ModuleFn(method, path, fn, runtimeName, modulePath string) error {
 		}
 		var resp moduleResponse
 		if len(out) > 0 {
-			if err := json.Unmarshal(out, &resp); err != nil {
+			if err := jsonenc.Unmarshal(out, &resp); err != nil {
 				// Treat bare JSON output as the body with status 200.
 				return c.Bytes(200, out)
 			}
