@@ -77,14 +77,41 @@ func (c *Ctx) SetHeader(name, value string) { c.fc.Set(name, value) }
 // Body returns the raw request body.
 func (c *Ctx) Body() []byte { return c.fc.Body() }
 
-// Bind parses the request body into v based on Content-Type. JSON by default.
-func (c *Ctx) Bind(v any) error { return c.fc.Bind().Body(v) }
+// Bind parses the request body into v based on Content-Type (JSON by
+// default) and runs struct-tag validation (required/min/max/minlen/maxlen).
+// Returns a *HTTPError(400) when either step fails so handlers can
+// return the error directly.
+func (c *Ctx) Bind(v any) error {
+	if err := c.fc.Bind().Body(v); err != nil {
+		return ErrBadRequest("invalid body: " + err.Error())
+	}
+	if err := validate(v); err != nil {
+		return ErrBadRequest(err.Error())
+	}
+	return nil
+}
 
-// BindQuery parses query parameters into v.
-func (c *Ctx) BindQuery(v any) error { return c.fc.Bind().Query(v) }
+// BindQuery parses query parameters into v and runs validation.
+func (c *Ctx) BindQuery(v any) error {
+	if err := c.fc.Bind().Query(v); err != nil {
+		return ErrBadRequest("invalid query: " + err.Error())
+	}
+	if err := validate(v); err != nil {
+		return ErrBadRequest(err.Error())
+	}
+	return nil
+}
 
-// BindURI parses URL params into v.
-func (c *Ctx) BindURI(v any) error { return c.fc.Bind().URI(v) }
+// BindURI parses URL params into v and runs validation.
+func (c *Ctx) BindURI(v any) error {
+	if err := c.fc.Bind().URI(v); err != nil {
+		return ErrBadRequest("invalid uri: " + err.Error())
+	}
+	if err := validate(v); err != nil {
+		return ErrBadRequest(err.Error())
+	}
+	return nil
+}
 
 // ----- response writers ----------------------------------------------------
 
@@ -185,4 +212,3 @@ func errorHandler(c fiber.Ctx, err error) error {
 	c.Status(500)
 	return c.JSON(&HTTPError{Status: 500, Msg: err.Error()})
 }
-
