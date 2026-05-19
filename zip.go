@@ -30,7 +30,15 @@ import (
 	luxlog "github.com/luxfi/log"
 
 	"github.com/hanzoai/zip/runtime"
+	"github.com/hanzoai/zip/zaprpc"
 )
+
+// zaprpcRegistry is an alias so the App field doesn't carry a deep type
+// path; full type lives in package zaprpc.
+type zaprpcRegistry = zaprpc.Registry
+
+// newZAPRegistry constructs the ZAP RPC service registry.
+func newZAPRegistry() *zaprpcRegistry { return zaprpc.NewRegistry() }
 
 // Handler is zip's request handler signature. Returning an error causes
 // Fiber's error chain to write a JSON response.
@@ -79,12 +87,14 @@ type Config struct {
 // App is the zip application. It wraps *fiber.App and exposes the zip
 // handler signature alongside generic typed handlers.
 type App struct {
-	cfg     Config
-	logger  luxlog.Logger
-	loader  runtime.Loader
-	fiber   *fiber.App
-	ops     []*registeredOp
-	closers []func() error
+	cfg         Config
+	logger      luxlog.Logger
+	loader      runtime.Loader
+	fiber       *fiber.App
+	ops         []*registeredOp
+	closers     []func() error
+	zapReg      *zaprpcRegistry
+	zapListener interface{ Close() error }
 }
 
 // New constructs an App with the given config. Defaults are applied
