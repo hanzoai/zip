@@ -112,6 +112,12 @@ func (a *App) ModuleFn(method, path, fn, runtimeName, modulePath string) error {
 		if len(resp.Body) == 0 {
 			return c.NoContent(resp.Status)
 		}
+		// Default to application/json for module responses when no
+		// Content-Type was set by the module. Modules can override via
+		// the response envelope's headers map.
+		if resp.Headers["Content-Type"] == "" && resp.Headers["content-type"] == "" {
+			c.SetHeader("Content-Type", "application/json; charset=utf-8")
+		}
 		return c.Bytes(resp.Status, resp.Body)
 	}
 	a.method(method, path, handler)
