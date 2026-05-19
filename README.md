@@ -64,6 +64,50 @@ go get github.com/hanzoai/zip
 Module path: `github.com/hanzoai/zip`. Go version: 1.26.3 (forced by
 luxfi/log).
 
+## JSON: encoding/json/v2 at the edge
+
+zip routes every JSON path — `c.JSON`, `c.Bind().Body`, the typed
+`zip.Get[In,Out]` round-trip, the HIP-0105 module envelope, the
+auto-OpenAPI spec — through one internal helper
+(`internal/jsonenc`). When the binary is compiled with
+`GOEXPERIMENT=jsonv2` (Go 1.25+), that helper is backed by the stdlib
+`encoding/json/v2`; otherwise it falls back to `encoding/json` v1.
+There is no third-party JSON library: stdlib only, per HIP-0106's
+canonical Hanzo Go stack.
+
+```bash
+# Compile with v2 (preferred — ~10% faster on the edge,
+# ~25% fewer allocations per request)
+GOEXPERIMENT=jsonv2 go build ./...
+
+# Without the experiment, v1 is selected:
+go build ./...
+```
+
+`zip.JSONVariant` is a build-time constant exposing which impl is
+active. `zip.New` logs it once at startup so operators can confirm v2
+is on in CI/prod logs:
+
+```
+{"level":"info","module":"zip","json_variant":"encoding/json/v2","message":"zip new"}
+```
+
+Benchmarks (Apple M1 Max, Go 1.26, fiber/v3):
+
+| Bench | json v1 ns/op | json/v2 ns/op | v1 allocs | v2 allocs | Δ |
+|---|---|---|---|---|---|
+| Edge POST + JSON roundtrip | 14972 | 13631 | 73 | 56 | -9% time, -23% allocs |
+| Marshal-only | 10798 | 7924 | 34 | 34 | -27% time |
+| Unmarshal-only | 13803 | 12729 | 67 | 50 | -8% time, -25% allocs |
+
+Reproduce with `go test -bench=BenchmarkJSON -benchmem ./...` and
+again with `GOEXPERIMENT=jsonv2`.
+
+Per HIP-0106 "Wire protocol stack": JSON marshalling happens at most
+ONCE per request (at the subsystem handler boundary, through zip).
+Inter-subsystem calls use ZAP-typed Go values via `cloud.Deps`. JSON
+is the edge format only.
+
 ## Architecture
 
 - `zip.App` wraps `*fiber.App`. One binary, one server, no escape
