@@ -34,7 +34,8 @@ func main() {
 			Name string `json:"name" validate:"required"`
 		}
 		if err := c.Bind(&body); err != nil {
-			return zip.ErrBadRequest(err.Error())
+			// c.Bind already returns *zip.HTTPError(400) on failure.
+			return err
 		}
 		return c.JSON(201, body)
 	})

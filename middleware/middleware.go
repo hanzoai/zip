@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"runtime/debug"
@@ -193,7 +194,7 @@ func StripIdentityHeaders() zip.Handler {
 type AuthVerifier interface {
 	// Verify validates the bearer token and returns the canonical
 	// X-* headers to mint (Org / User / Email / IsAdmin / Roles).
-	Verify(ctx interface{ /* context-like */ }, bearer string) (Identity, error)
+	Verify(ctx context.Context, bearer string) (Identity, error)
 }
 
 // Identity is the validated identity payload returned by AuthVerifier.

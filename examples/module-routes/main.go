@@ -41,10 +41,10 @@ type stubModule struct {
 	rt  string
 }
 
-func (m *stubModule) Name() string                      { return m.dir }
-func (m *stubModule) Runtime() string                   { return m.rt }
-func (m *stubModule) Exports() []string                 { return []string{"handler"} }
-func (m *stubModule) Close() error                      { return nil }
+func (m *stubModule) Name() string      { return m.dir }
+func (m *stubModule) Runtime() string   { return m.rt }
+func (m *stubModule) Exports() []string { return []string{"handler"} }
+func (m *stubModule) Close() error      { return nil }
 func (m *stubModule) Invoke(_ context.Context, fn string, payload []byte) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"status":  200,
@@ -55,8 +55,8 @@ func (m *stubModule) Invoke(_ context.Context, fn string, payload []byte) ([]byt
 
 func main() {
 	app := zip.New(zip.Config{
-		AppName: "module-routes",
-		Loader:  stubLoader{},
+		AppName:         "module-routes",
+		Loader:          stubLoader{},
 		AllowedRuntimes: []string{"goja", "wazero", "pyvm", "starlark"},
 	})
 	app.Use(middleware.Recover(), middleware.RequestID())
