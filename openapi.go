@@ -1,12 +1,13 @@
 package zip
 
 import (
-	"encoding/json"
 	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/hanzoai/zip/internal/jsonenc"
 )
 
 // OpenAPIConfig configures the auto-generated /.well-known/openapi.json
@@ -29,7 +30,7 @@ func (a *App) installOpenAPIRoutes() {
 		return
 	}
 	spec := a.buildOpenAPI()
-	specJSON, _ := json.Marshal(spec)
+	specJSON, _ := jsonenc.Marshal(spec)
 
 	a.fiber.Get("/.well-known/openapi.json", func(fc fiber.Ctx) error {
 		fc.Set("Content-Type", "application/json")
