@@ -88,6 +88,24 @@ type Config struct {
 	// which renders {error, code, status} JSON.
 	ErrorHandler fiber.ErrorHandler
 
+	// Concurrency caps the maximum number of concurrent connections the
+	// server will accept. Default 0 means fasthttp's own default
+	// (256*1024). Ops should cap this at the per-replica budget — see
+	// `~/work/hanzo/hips/docs/SCALE_STANDARD.md`. With Hanzo's verified
+	// 8 KiB/conn budget, 100_000 sits at ~800 MiB inside a 1 GiB pod.
+	Concurrency int
+
+	// ReadBufferSize is fasthttp's per-conn request-read buffer (default
+	// 4 KiB). Raise only for header-heavy upstreams; raising it inflates
+	// the per-conn memory budget and breaks the conn-memory regression
+	// gate (see SCALE_STANDARD.md §8).
+	ReadBufferSize int
+
+	// WriteBufferSize is fasthttp's per-conn response-write buffer
+	// (default 4 KiB). Raise only for streaming-heavy responses; same
+	// budget caveat as ReadBufferSize.
+	WriteBufferSize int
+
 	// OpenAPI configures the auto-generated /.well-known/openapi.json
 	// served when typed handlers are registered.
 	OpenAPI OpenAPIConfig
@@ -129,6 +147,12 @@ func New(cfg Config) *App {
 		// back to encoding/json. Same call site, different bytes-out.
 		JSONEncoder: jsonenc.Marshal,
 		JSONDecoder: jsonenc.Unmarshal,
+		// Per-conn scale knobs from SCALE_STANDARD.md §6 — zero values
+		// fall through to fasthttp defaults (256k concurrent / 4 KiB
+		// read+write buffers).
+		Concurrency:     cfg.Concurrency,
+		ReadBufferSize:  cfg.ReadBufferSize,
+		WriteBufferSize: cfg.WriteBufferSize,
 	}
 	if cfg.ServerHeader != "-" {
 		fcfg.ServerHeader = cfg.ServerHeader
