@@ -29,18 +29,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	luxlog "github.com/luxfi/log"
 
-	"github.com/hanzoai/zip/internal/jsonenc"
 	"github.com/hanzoai/zip/runtime"
 	"github.com/hanzoai/zip/zaprpc"
 )
-
-// JSONVariant reports which JSON implementation zip is using in this
-// build — "encoding/json/v2" when compiled with GOEXPERIMENT=jsonv2,
-// "encoding/json" otherwise. Exposed for cmd/cloud startup logs and
-// for tests that need to assert the variant. Per HIP-0106 the wire
-// stack is "JSON only at edge, ZAP between services"; this constant
-// tells operators which JSON impl is on the edge.
-const JSONVariant = jsonenc.Variant
 
 // zaprpcRegistry is an alias so the App field doesn't carry a deep type
 // path; full type lives in package zaprpc.
@@ -122,13 +113,6 @@ func New(cfg Config) *App {
 	fcfg := fiber.Config{
 		AppName:   cfg.AppName,
 		BodyLimit: cfg.BodyLimit,
-		// Route every Fiber JSON path through zip's jsonenc package: this
-		// covers c.JSON(), c.Bind().Body(), and the default error
-		// handler when it serializes HTTPError. With GOEXPERIMENT=jsonv2
-		// the underlying impl is encoding/json/v2; otherwise it falls
-		// back to encoding/json. Same call site, different bytes-out.
-		JSONEncoder: jsonenc.Marshal,
-		JSONDecoder: jsonenc.Unmarshal,
 	}
 	if cfg.ServerHeader != "-" {
 		fcfg.ServerHeader = cfg.ServerHeader
@@ -138,8 +122,6 @@ func New(cfg Config) *App {
 	} else {
 		fcfg.ErrorHandler = errorHandler
 	}
-
-	cfg.Logger.Info("zip new", "json_variant", jsonenc.Variant)
 
 	return &App{
 		cfg:    cfg,

@@ -2,11 +2,10 @@ package zip
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 
 	"github.com/gofiber/fiber/v3"
-
-	"github.com/hanzoai/zip/internal/jsonenc"
 )
 
 // TypedHandler is the generic handler signature: takes an *In, returns
@@ -84,7 +83,7 @@ func registerTyped[In, Out any](app *App, method, path string, fn TypedHandler[I
 		var in In
 		if method != "GET" && method != "HEAD" {
 			if len(c.Body()) > 0 {
-				if err := jsonenc.Unmarshal(c.Body(), &in); err != nil {
+				if err := json.Unmarshal(c.Body(), &in); err != nil {
 					return ErrBadRequest("invalid json body: " + err.Error())
 				}
 			}

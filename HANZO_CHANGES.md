@@ -30,7 +30,7 @@ Every file from upstream has been deleted. We kept the name.
 | Validation | ~120 LOC reflection: `required`, `min/max`, `minlen/maxlen` struct tags. |
 | OpenAPI | Auto-generated at `/.well-known/openapi.json`; Swagger UI at `/docs`. |
 | Extension routes | `app.Module(method+path, runtime, dir)` — HIP-0105 surface. Loader is duck-typed (no hanzoai/base dep). |
-| Middleware | `Recover`, `Logger`, `RequestID`, `Timeout`, `MaxBody`, `CORS`, `RateLimit`, `Telemetry`. Auth + StripIdentityHeaders moved to hanzoai/gateway/middleware (HIP-0106). |
+| Middleware | `Recover`, `Logger`, `RequestID`, `Timeout`, `MaxBody`, `CORS`, `Auth`, `RateLimit`, `Telemetry`, `StripIdentityHeaders`. |
 | Adapters | `AdaptNetHTTP / AdaptNetHTTPFunc / AdaptNetHTTPMiddleware`; `app.Mount(prefix, http.Handler)`. |
 | WebSocket | `wsx.Upgrade(fn)` over fasthttp/websocket. |
 | Streaming | `c.SendStream(reader)` + `c.SendStreamWriter(fn)`. |

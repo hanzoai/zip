@@ -1,15 +1,12 @@
-// Package middleware ships zip's canonical generic middleware stack.
+// Package middleware ships zip's canonical middleware stack.
 // Use these via app.Use(middleware.Recover(), middleware.RequestID(), ...).
 //
 // Every middleware here is a zip.Handler (NOT a raw fiber.Handler) so
 // the user-facing handler signature stays uniform.
-//
-// Auth-specific middleware (JWT validation, identity-header stripping)
-// lives in github.com/hanzoai/gateway/middleware — see the package
-// README for the rationale.
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"runtime/debug"
@@ -167,6 +164,84 @@ func CORS(cfg CORSConfig) zip.Handler {
 	}
 }
 
-// Auth-specific middleware (JWT validation, identity-header stripping)
-// has moved to github.com/hanzoai/gateway/middleware. See that package's
-// README and zip/middleware/README.md for the rationale.
+// StripIdentityHeaders strips client-supplied X-Org-Id / X-User-Id /
+// X-User-Email / X-User-IsAdmin / X-Roles / X-User-Permissions from the
+// request before any other middleware runs. Per HIP-0026, only the
+// gateway-minted path is trusted; everything else must be stripped to
+// prevent client spoofing.
+//
+// Use this when a service runs WITHOUT a Hanzo gateway in front (rare).
+// When deployed behind hanzoai/gateway, the gateway strips these
+// unconditionally and re-mints from JWT — leave this middleware OFF in
+// that topology.
+func StripIdentityHeaders() zip.Handler {
+	return func(c *zip.Ctx) error {
+		req := c.Fiber().Request()
+		req.Header.Del("X-Org-Id")
+		req.Header.Del("X-User-Id")
+		req.Header.Del("X-User-Email")
+		req.Header.Del("X-User-IsAdmin")
+		req.Header.Del("X-Roles")
+		req.Header.Del("X-User-Permissions")
+		return c.Continue()
+	}
+}
+
+// AuthVerifier is the interface zip.Auth() consumes. The real
+// implementation in hanzoai/iam or hanzoai/gateway-sdk satisfies it.
+// A nil verifier on a request that has no gateway X-* headers and no
+// Authorization bearer is rejected with 401.
+type AuthVerifier interface {
+	// Verify validates the bearer token and returns the canonical
+	// X-* headers to mint (Org / User / Email / IsAdmin / Roles).
+	Verify(ctx context.Context, bearer string) (Identity, error)
+}
+
+// Identity is the validated identity payload returned by AuthVerifier.
+type Identity struct {
+	Org       string
+	User      string
+	UserEmail string
+	IsAdmin   bool
+	Roles     []string
+}
+
+// Auth validates incoming requests via verifier. When the request already
+// carries gateway-minted X-Org-Id (i.e. behind hanzoai/gateway), the
+// verifier is bypassed and the headers are trusted. Otherwise the
+// Authorization: Bearer <token> is verified.
+//
+// Pass a nil verifier to only accept gateway-minted headers (no in-binary
+// JWT validation).
+func Auth(verifier AuthVerifier) zip.Handler {
+	return func(c *zip.Ctx) error {
+		// Trust the gateway path first.
+		if c.Org() != "" || c.User() != "" {
+			return c.Continue()
+		}
+		if verifier == nil {
+			return zip.ErrUnauthorized("authentication required")
+		}
+		raw := c.Header("Authorization")
+		if !strings.HasPrefix(raw, "Bearer ") {
+			return zip.ErrUnauthorized("missing bearer token")
+		}
+		id, err := verifier.Verify(c.Context(), raw[len("Bearer "):])
+		if err != nil {
+			return zip.ErrUnauthorized("invalid token")
+		}
+		// Mint the validated headers so handlers see the same shape as
+		// the gateway-fronted path.
+		req := c.Fiber().Request()
+		req.Header.Set("X-Org-Id", id.Org)
+		req.Header.Set("X-User-Id", id.User)
+		req.Header.Set("X-User-Email", id.UserEmail)
+		if id.IsAdmin {
+			req.Header.Set("X-User-IsAdmin", "true")
+		}
+		if len(id.Roles) > 0 {
+			req.Header.Set("X-Roles", strings.Join(id.Roles, ","))
+		}
+		return c.Continue()
+	}
+}
