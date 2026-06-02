@@ -117,8 +117,9 @@ is the edge format only.
 - Handlers are `func(c *zip.Ctx) error`. Returning a `*zip.HTTPError`
   controls the response status; everything else becomes 500 JSON.
 - Middleware lives in `zip/middleware/` — `Recover`, `Logger`,
-  `RequestID`, `Auth`, `RateLimit`, `CORS`, `MaxBody`, `Telemetry`,
-  `StripIdentityHeaders`.
+  `RequestID`, `RateLimit`, `CORS`, `MaxBody`, `Telemetry`. Auth-
+  specific middleware (`Auth`, `StripIdentityHeaders`) lives in
+  `github.com/hanzoai/gateway/middleware` per HIP-0106.
 - Adapters in `zip/adapt.go` — `AdaptNetHTTP / AdaptNetHTTPFunc /
   AdaptNetHTTPMiddleware`. Migration tools only — replace adapted
   routes with native handlers when feasible.
