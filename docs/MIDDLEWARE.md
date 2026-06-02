@@ -73,32 +73,19 @@ app.Use(middleware.CORS(middleware.CORSConfig{
 }))
 ```
 
-## Auth
+## Auth & StripIdentityHeaders — moved
 
-When the service is fronted by hanzoai/gateway, the gateway mints the
-`X-Org-Id / X-User-Id / X-User-Email` headers from validated JWTs. Auth
-middleware trusts those headers on the gateway-fronted path; on direct
-deployments it falls back to verifying `Authorization: Bearer <token>`
-via an injected `AuthVerifier`.
+Auth-specific middleware (JWT validation, identity-header stripping)
+has moved to
+[`github.com/hanzoai/gateway/middleware`](https://github.com/hanzoai/gateway/tree/main/middleware).
 
-```go
-// Trust gateway only:
-app.Use(middleware.Auth(nil))
-
-// Verify bearer tokens in-process:
-app.Use(middleware.Auth(myIAMVerifier))
-```
-
-## StripIdentityHeaders
-
-For deployments that do NOT run behind hanzoai/gateway — strips
-client-supplied `X-Org-Id / X-User-Id / X-User-Email / X-User-IsAdmin /
-X-Roles / X-User-Permissions` before any other middleware. Per
-HIP-0026, only gateway-minted identity is trusted.
-
-```go
-app.Use(middleware.StripIdentityHeaders(), middleware.Auth(myVerifier))
-```
+Rationale: JWT validation + identity-header minting are the gateway
+subsystem's responsibility per HIP-0106. Other subsystems mounted
+inside the unified `cloud` binary trust the gateway-minted `X-Org-Id`
+header and do not re-validate JWTs themselves. The trust-assertion
+helper `gateway.AssertGatewayMinted(c)` lets a downstream handler
+defend against deployment misconfiguration where it is accidentally
+exposed to direct (non-gateway) traffic.
 
 ## RateLimit
 
@@ -123,17 +110,19 @@ app.Use(middleware.Telemetry(myO11ySink))
 
 ## Order
 
-Recommended order for a Hanzo service:
+Recommended order for a Hanzo service behind hanzoai/gateway:
 
 ```go
 app.Use(
     middleware.Recover(),              // 1. always first
-    middleware.StripIdentityHeaders(), // 2. only if not behind gateway
-    middleware.RequestID(),            // 3. mint request id
-    middleware.Logger(app.Logger()),   // 4. log with request id
-    middleware.Telemetry(o11y),        // 5. metrics
-    middleware.Auth(verifier),         // 6. validate identity
-    middleware.RateLimit(rlCfg),       // 7. limit authenticated requests
-    middleware.CORS(corsCfg),          // 8. last — close to response
+    middleware.RequestID(),            // 2. mint request id
+    middleware.Logger(app.Logger()),   // 3. log with request id
+    middleware.Telemetry(o11y),        // 4. metrics
+    middleware.RateLimit(rlCfg),       // 5. limit
+    middleware.CORS(corsCfg),          // 6. last — close to response
 )
 ```
+
+JWT validation + identity-header stripping are owned by the gateway
+subsystem; see
+[`github.com/hanzoai/gateway/middleware`](https://github.com/hanzoai/gateway/tree/main/middleware).
