@@ -1,0 +1,36 @@
+# Build outputs
+/bin/
+/dist/
+/build/
+
+# Go binaries / test artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Vendored dependencies (only if `go mod vendor` is used)
+/vendor/
+
+# Local config & secrets
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
