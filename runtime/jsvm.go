@@ -13,6 +13,8 @@
 package runtime
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -96,11 +98,102 @@ func (rt *JSRuntime) provision(vm *goja.Runtime) error {
 }
 
 // Eval evaluates src in a pooled VM and returns the exported Go value of
-// the result (via goja's Export()).
+// the result (via goja's Export()). It is EvalContext with a background
+// context — the evaluation cannot be cancelled.
 func (rt *JSRuntime) Eval(src string) (any, error) {
+	return rt.EvalContext(context.Background(), src)
+}
+
+// EvalContext evaluates src in a pooled VM under ctx and returns the
+// exported Go value of the result. If ctx is cancelled or its deadline is
+// exceeded before the evaluation completes, the running goja VM is
+// interrupted and EvalContext returns ctx.Err() (context.Canceled or
+// context.DeadlineExceeded). goja is single-threaded per borrowed VM, so
+// a tight loop like `while(true){}` is preempted at the next interrupt
+// check point rather than blocking the caller indefinitely.
+func (rt *JSRuntime) EvalContext(ctx context.Context, src string) (any, error) {
 	var out any
 	err := rt.pool.run(func(vm *goja.Runtime) error {
-		v, err := vm.RunString(src)
+		v, err := runUnderCtx(ctx, vm, func() (goja.Value, error) {
+			return vm.RunString(src)
+		})
+		if err != nil {
+			return err
+		}
+		if v != nil {
+			out = v.Export()
+		}
+		return nil
+	})
+	return out, err
+}
+
+// runUnderCtx runs fn (a goja evaluation on vm) while a watcher goroutine
+// interrupts vm if ctx finishes first. It always tears the watcher down
+// and clears any pending interrupt before returning, so the VM is clean
+// for the next borrower. When the interrupt fired, the goja
+// *InterruptedError carrying ctx.Err() is unwrapped back to that error.
+func runUnderCtx(ctx context.Context, vm *goja.Runtime, fn func() (goja.Value, error)) (goja.Value, error) {
+	// Fast path: no cancellation possible, skip the watcher goroutine.
+	if ctx.Done() == nil {
+		return fn()
+	}
+	// Already cancelled before we start: don't even enter the VM.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	done := make(chan struct{})
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		select {
+		case <-ctx.Done():
+			vm.Interrupt(ctx.Err())
+		case <-done:
+		}
+	}()
+
+	v, err := fn()
+
+	close(done)         // signal the watcher to stop
+	<-watcherDone       // wait until it can no longer call Interrupt
+	vm.ClearInterrupt() // drop any interrupt it set, clean for reuse
+
+	if err != nil {
+		var ie *goja.InterruptedError
+		if errors.As(err, &ie) {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			if v, ok := ie.Value().(error); ok {
+				return nil, v
+			}
+		}
+		return nil, err
+	}
+	return v, nil
+}
+
+// InvokeFunc calls the global JS function named fnName with args (each
+// converted to a goja value) and returns the exported Go value of its
+// result. Like EvalContext, the call is interrupted and ctx.Err() is
+// returned if ctx finishes before the function does. The named value must
+// already be defined in the runtime (via Eval/EvalContext or LoadModule).
+func (rt *JSRuntime) InvokeFunc(ctx context.Context, fnName string, args ...any) (any, error) {
+	var out any
+	err := rt.pool.run(func(vm *goja.Runtime) error {
+		fn, ok := goja.AssertFunction(vm.Get(fnName))
+		if !ok {
+			return fmt.Errorf("zip/runtime: %q is not a callable JS function", fnName)
+		}
+		argv := make([]goja.Value, len(args))
+		for i, a := range args {
+			argv[i] = vm.ToValue(a)
+		}
+		v, err := runUnderCtx(ctx, vm, func() (goja.Value, error) {
+			return fn(goja.Undefined(), argv...)
+		})
 		if err != nil {
 			return err
 		}
