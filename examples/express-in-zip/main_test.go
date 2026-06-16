@@ -43,6 +43,44 @@ func TestExpressInZip(t *testing.T) {
 	})
 }
 
+// TestRuntimeRoute drives the unified runner over HTTP: the request body
+// is the source, :lang selects the backend. js evaluates in real goja; an
+// unregistered language is a 404 with a structured error.
+func TestRuntimeRoute(t *testing.T) {
+	app, err := setup()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("POST /runtime/js evaluates source", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/runtime/js", strings.NewReader("40+2"))
+		resp, err := app.Fiber().Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 200 {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		// goja Export() of an integer arithmetic result is int64; JSON
+		// encodes it as the bare number 42.
+		assertContainsAll(t, string(body), `"result":42`)
+	})
+
+	t.Run("POST /runtime/cobol is 404 unknown language", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/runtime/cobol", strings.NewReader("DISPLAY 'HI'."))
+		resp, err := app.Fiber().Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 404 {
+			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		assertContainsAll(t, string(body), `"error":"unknown language"`)
+	})
+}
+
 func assertContainsAll(t *testing.T, body string, wants ...string) {
 	t.Helper()
 	for _, w := range wants {

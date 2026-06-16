@@ -238,6 +238,37 @@ func (rt *JSRuntime) withVM(fn func(vm *goja.Runtime) error) error {
 	return rt.pool.run(fn)
 }
 
+// Engine adapts this JSRuntime to the Runner's Engine interface so it can
+// be registered as a language backend:
+//
+//	runner.Register("js", rt.Engine())
+//
+// The adapter is deliberately NOT Interruptible at the Runner seam:
+// EvalContext already owns the per-call interrupt watcher and targets the
+// exact pooled VM the call borrowed (interrupting only that VM, never a
+// sibling concurrent call's VM). A Runner-level Interrupt would have to
+// fan out to every pooled VM and could abort unrelated concurrent calls.
+// So the goja engine self-manages cancellation inside Eval; the Runner's
+// watcher is a no-op for it (and the registration warning is suppressed
+// because Eval honors ctx fully). Engines without internal ctx handling
+// implement Interruptible and let the Runner's watcher abort them.
+func (rt *JSRuntime) Engine() Engine { return jsEngine{rt} }
+
+// jsEngine is the goja Engine. Eval delegates to EvalContext, which runs
+// the pool + joined-watcher path and fully honors ctx on the correct
+// borrowed VM. args are ignored: a top-level expression's value is the
+// result (use a trailing identifier to "return" a defined function).
+type jsEngine struct{ rt *JSRuntime }
+
+func (e jsEngine) Eval(ctx context.Context, src []byte, _ ...any) (any, error) {
+	return e.rt.EvalContext(ctx, string(src))
+}
+
+// ctxHonored marks an Engine that fully manages ctx cancellation inside
+// Eval, so the Runner skips the "not interruptible" warning and its
+// watcher is a harmless no-op. jsEngine qualifies via EvalContext.
+func (jsEngine) ctxHonored() {}
+
 // newVM constructs a bare goja runtime with zip's field-name mapping
 // (Go struct fields exported with their JSON tag names where present, so
 // host objects look idiomatic from JS).
