@@ -1,0 +1,155 @@
+// jsvm.go embeds a pure-Go JavaScript runtime (goja) into zip so a
+// service can run TS/JS handlers in-process — no separate runtime
+// service, no inter-service RPC, no container-per-service. Combined
+// with esbuild.go (TS/modern-JS → ES5) this is zip's migration path:
+// legacy TS source compiles to ES5 and drops straight into the embedded
+// VM, then gets rewritten to a native Go handler in place over time.
+//
+// The pool pattern is lifted from hanzoai/base/plugins/gojavm and
+// slimmed to what zip needs: each *goja.Runtime carries the host
+// functions and modules registered at construction time, and requests
+// borrow a free VM (or a one-off when the pool is saturated) so they
+// never pay per-request VM creation cost.
+package runtime
+
+import (
+	"fmt"
+	"sync"
+
+	"github.com/dop251/goja"
+)
+
+// JSOptions configures a JSRuntime.
+type JSOptions struct {
+	// PoolSize is the number of pre-warmed *goja.Runtime kept hot. When
+	// every pooled VM is busy, calls fall back to a freshly-built VM that
+	// is discarded after the call. 0 selects a default of 8.
+	PoolSize int
+
+	// HostFns are Go functions exposed to JS as globals. Applied to every
+	// VM in the pool (and to one-off VMs). Equivalent to calling
+	// RegisterHostFn for each entry after construction, but applied to
+	// the whole pool atomically at build time.
+	HostFns map[string]any
+
+	// Modules are CommonJS-style module sources registered into every VM,
+	// reachable from JS via require(name). Applied at build time.
+	Modules map[string]string
+}
+
+// JSRuntime is an embedded JavaScript runtime backed by a pool of goja
+// VMs. It is safe for concurrent use: each call borrows an isolated VM.
+type JSRuntime struct {
+	pool *vmPool
+
+	mu      sync.Mutex // guards the registration sets below
+	hostFns map[string]any
+	modules map[string]string
+}
+
+// NewJSRuntime builds a JSRuntime with the given options. Host functions
+// and modules from opts are applied to every VM in the pool.
+func NewJSRuntime(opts JSOptions) (*JSRuntime, error) {
+	size := opts.PoolSize
+	if size <= 0 {
+		size = 8
+	}
+	rt := &JSRuntime{
+		hostFns: map[string]any{},
+		modules: map[string]string{},
+	}
+	for k, v := range opts.HostFns {
+		rt.hostFns[k] = v
+	}
+	for k, v := range opts.Modules {
+		rt.modules[k] = v
+	}
+
+	var buildErr error
+	rt.pool = newVMPool(size, func() *goja.Runtime {
+		vm := newVM()
+		if err := rt.provision(vm); err != nil && buildErr == nil {
+			buildErr = err
+		}
+		return vm
+	})
+	if buildErr != nil {
+		return nil, buildErr
+	}
+	return rt, nil
+}
+
+// provision installs the registered host functions and modules into one
+// VM. Called for every pooled VM at build time and for one-off VMs.
+func (rt *JSRuntime) provision(vm *goja.Runtime) error {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	for name, fn := range rt.hostFns {
+		if err := vm.Set(name, fn); err != nil {
+			return fmt.Errorf("zip/runtime: register host fn %q: %w", name, err)
+		}
+	}
+	if err := installRequire(vm, rt.modules); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Eval evaluates src in a pooled VM and returns the exported Go value of
+// the result (via goja's Export()).
+func (rt *JSRuntime) Eval(src string) (any, error) {
+	var out any
+	err := rt.pool.run(func(vm *goja.Runtime) error {
+		v, err := vm.RunString(src)
+		if err != nil {
+			return err
+		}
+		if v != nil {
+			out = v.Export()
+		}
+		return nil
+	})
+	return out, err
+}
+
+// RegisterHostFn exposes a Go function to JS as a global named name. The
+// function is applied to every VM in the pool and to one-off VMs built
+// afterwards. fn may be any value goja can bind (typically a Go func).
+func (rt *JSRuntime) RegisterHostFn(name string, fn any) error {
+	rt.mu.Lock()
+	rt.hostFns[name] = fn
+	rt.mu.Unlock()
+	return rt.pool.forEach(func(vm *goja.Runtime) error {
+		if err := vm.Set(name, fn); err != nil {
+			return fmt.Errorf("zip/runtime: register host fn %q: %w", name, err)
+		}
+		return nil
+	})
+}
+
+// LoadModule registers a CommonJS-style module under name. The module
+// source is evaluated lazily the first time require(name) is called in a
+// given VM. Applied to every pooled VM.
+func (rt *JSRuntime) LoadModule(name, src string) error {
+	rt.mu.Lock()
+	rt.modules[name] = src
+	rt.mu.Unlock()
+	return rt.pool.forEach(func(vm *goja.Runtime) error {
+		return registerModule(vm, name, src)
+	})
+}
+
+// withVM borrows a VM from the pool for the duration of fn. Used by
+// handler.go to invoke a loaded JS function with a request/response pair.
+func (rt *JSRuntime) withVM(fn func(vm *goja.Runtime) error) error {
+	return rt.pool.run(fn)
+}
+
+// newVM constructs a bare goja runtime with zip's field-name mapping
+// (Go struct fields exported with their JSON tag names where present, so
+// host objects look idiomatic from JS).
+func newVM() *goja.Runtime {
+	vm := goja.New()
+	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+	return vm
+}
