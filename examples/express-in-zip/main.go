@@ -11,6 +11,7 @@ package main
 
 import (
 	_ "embed"
+	"errors"
 	"log"
 	"strings"
 
@@ -61,7 +62,36 @@ func setup() (*zip.App, error) {
 	app.Use(middleware.Recover(), middleware.RequestID())
 	app.Fiber().All("/legacy/*", stripPrefix("/legacy", h))
 
+	// 5. Unified multi-language runner. The request body is the source,
+	//    :lang selects the backend. zip ships the goja "js" engine in-tree;
+	//    a host that imports base additionally registers pyvm/v8vm/wasmvm/
+	//    starkvm here at startup — zip never imports base (see runtime/README).
+	runner := runtime.NewRunner()
+	if err := runner.Register("js", rt.Engine()); err != nil {
+		return nil, err
+	}
+	app.Fiber().Post("/runtime/:lang", runtimeHandler(runner))
+
 	return app, nil
+}
+
+// runtimeHandler reads the request body as source, dispatches it to the
+// engine registered for :lang, and returns {result, error} as JSON. An
+// unregistered language is a 404; an evaluation error is a 200 carrying
+// the error string in the body so the caller sees the engine's message.
+func runtimeHandler(runner runtime.Runner) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		lang := c.Params("lang")
+		res, err := runner.Run(c.Context(), lang, c.Body())
+		if err != nil {
+			if errors.Is(err, runtime.ErrUnknownLanguage) {
+				return c.Status(fiber.StatusNotFound).
+					JSON(fiber.Map{"error": "unknown language"})
+			}
+			return c.JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"result": res})
+	}
 }
 
 // stripPrefix rewrites the request path to drop prefix before delegating
