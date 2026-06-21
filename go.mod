@@ -9,7 +9,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.2.0
 	github.com/luxfi/log v1.4.3
 	github.com/valyala/fasthttp v1.70.0
-	github.com/zap-proto/go v1.1.0
+	github.com/zap-proto/go v1.3.0
 )
 
 require (
