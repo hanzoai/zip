@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="zip" width="880"></p>
+
 # zip
 
 Hanzo's canonical Go web framework. Built on **Fiber v3 / fasthttp**.
