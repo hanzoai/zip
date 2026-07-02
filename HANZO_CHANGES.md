@@ -34,7 +34,8 @@ Every file from upstream has been deleted. We kept the name.
 | Adapters | `AdaptNetHTTP / AdaptNetHTTPFunc / AdaptNetHTTPMiddleware`; `app.Mount(prefix, http.Handler)`. |
 | WebSocket | `wsx.Upgrade(fn)` over fasthttp/websocket. |
 | Streaming | `c.SendStream(reader)` + `c.SendStreamWriter(fn)`. |
-| ZAP RPC | `zaprpc.Service`/`Registry`/`Dispatch` + `app.ZAPRegistry()`. Wire dispatcher stubbed. |
+| ZAP transport | `app.ListenZAP(addr)` serves the whole app over ZAP (via zap-proto/http); `app.ListenHTTP(addr)` is the plain-HTTP extra; `app.Serve(zapAddr, httpAddr)` runs both. Routes ARE the ZAP surface. |
+| Named-service RPC (optional) | `zaprpc.Service`/`Registry`/`Dispatch` + `zaprpc.HTTPHandler(reg)` for a gRPC-style named-service surface on top of the transport. |
 
 ## Dependencies
 

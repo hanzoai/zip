@@ -40,5 +40,5 @@ func main() {
 		return c.JSON(201, body)
 	})
 
-	log.Fatal(app.Listen(":8080"))
+	log.Fatal(app.ListenHTTP(":8080"))
 }

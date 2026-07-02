@@ -1,12 +1,13 @@
-// Package zaprpc is the ZAP RPC dispatch surface exposed by zip.App.
-// ZAP is Hanzo's binary RPC transport (HIP-001x). zip.App.ZAPListen()
-// serves all registered ZAP services on a dedicated TCP port; one zip
-// binary speaks HTTP/JSON for human/REST clients AND ZAP RPC for
-// machine clients.
+// Package zaprpc is an OPTIONAL named-service RPC dispatch helper for zip
+// apps that want a Cap'n-Proto/gRPC-style service registry (name → method →
+// handler) rather than plain REST routes.
 //
-// **STATUS**: dispatcher and registry stubbed; full integration with
-// zapc-generated server code lands in a follow-up PR. The contract here
-// is stable enough to plumb today.
+// It is DECOUPLED from the transport: zip's primary transport is ZAP, wired
+// once in the framework (App.ListenZAP serves the whole fiber handler over
+// zap-proto/http — the routes ARE the ZAP surface, no registry needed). This
+// package is for the separate case where you want to expose generated
+// zapc <svc>_server.go services by name; mount it as an ordinary route with
+// zaprpc.HTTPHandler(registry) (see http.go), reachable over either transport.
 package zaprpc
 
 import (
@@ -25,7 +26,7 @@ type Service interface {
 	Handle(ctx context.Context, method string, payload []byte) ([]byte, error)
 }
 
-// Registry holds the set of services served by one zip.App.ZAPListen.
+// Registry holds a set of named services, dispatched via HTTPHandler.
 type Registry struct {
 	services map[string]Service
 }
@@ -59,10 +60,8 @@ func (r *Registry) Names() []string {
 var ErrNoService = errors.New("zaprpc: service not registered")
 
 // Dispatch invokes the named service+method against the registry. The
-// real ZAP wire-decode happens upstream of this function; Dispatch is
-// the seam zip.App.ZAPListen uses to route a parsed envelope to the
-// right handler. Surface is stable for service callers; the network
-// integration lands in the follow-up PR.
+// wire-decode happens upstream (HTTPHandler decodes the request envelope,
+// then calls Dispatch to route it to the right handler).
 func (r *Registry) Dispatch(ctx context.Context, service, method string, payload []byte) ([]byte, error) {
 	s, ok := r.services[service]
 	if !ok {

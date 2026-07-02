@@ -31,7 +31,7 @@ func main() {
         })
     })
 
-    _ = app.Listen(":8080")
+    _ = app.Serve(":9653", ":8080") // ZAP primary + HTTP extra
 }
 ```
 
@@ -56,11 +56,14 @@ func main() {
 - **SSE / streaming** — `c.SendStreamWriter` (Fiber v3 native).
 - **Drop-in migration** — `app.Mount("/legacy", chiRouter)` for any
   `http.Handler` (chi, gin, beego, net/http).
-- **ZAP RPC** — `app.ZAPRegistry()` holds the service registry;
-  `zaprpc.HTTPHandler(reg)` serves the ZAP RPC plane over HTTP POST
-  (canonical binary envelope in the body). `app.ZAPListen()` for the
-  dedicated TCP wire transport is stubbed pending zapc-generated
-  servers.
+- **ZAP transport** — `app.ListenZAP(":9653")` serves the whole app over
+  ZAP (TLS 1.3 + post-quantum, gRPC's replacement); `app.ListenHTTP(":8080")`
+  is the optional plain-HTTP extra; `app.Serve(zapAddr, httpAddr)` runs both.
+  Your routes ARE the ZAP surface — same handlers, middleware, and auth over
+  either transport, no separate RPC registration.
+- **Named-service RPC (optional)** — `zaprpc.Registry` + `zaprpc.HTTPHandler(reg)`
+  exposes generated `zapc` services by name at a route, for a gRPC-style
+  service surface on top of the transport.
 
 ## Install
 

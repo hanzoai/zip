@@ -1,46 +1,66 @@
 package zip
 
 import (
-	"fmt"
-	"net"
+	"github.com/gofiber/fiber/v3"
+	zaphttp "github.com/zap-proto/http"
 )
 
-// ZAPRegistry returns (creating if needed) the per-App zaprpc service
-// registry. Use this to attach generated *_server.go ZAP services.
+// The transport layer: ONE fiber handler, served over TWO transports.
 //
-//	zap := app.ZAPRegistry()
-//	zap.Register(validatev1.NewServer(impl))
-func (a *App) ZAPRegistry() *zaprpcRegistry {
-	if a.zapReg == nil {
-		a.zapReg = newZAPRegistry()
-	}
-	return a.zapReg
+// ZAP (TLS 1.3 + post-quantum, gRPC's replacement) is the PRIMARY transport;
+// plain HTTP is the optional EXTRA for human/REST/browser clients. Both serve
+// the SAME `a.fiber.Handler()`, so every /v1 route is reachable identically
+// over either — there is NO separate RPC surface to register, NO ordinal mux,
+// NO per-endpoint wiring. This is the one-and-only-one-way model: your routes
+// ARE the ZAP surface, exactly as they are the HTTP surface. (Supersedes the
+// old zaprpc-registry ZAPListen stub — the routes replace the registry.)
+
+// prepare installs the deferred routes (OpenAPI) before a listener starts.
+// Shared by both transports so ZAP and HTTP expose the same surface.
+func (a *App) prepare() { a.installOpenAPIRoutes() }
+
+// ListenHTTP serves plain HTTP on addr and blocks. The optional EXTRA
+// transport. (Was `Listen`; renamed for symmetry with ListenZAP — verb-first,
+// transport-suffixed, the way Go stdlib names net.Listen/http.ListenAndServe.)
+func (a *App) ListenHTTP(addr string) error {
+	a.prepare()
+	a.logger.Info("zip listening HTTP", "addr", addr)
+	return a.fiber.Listen(addr, fiber.ListenConfig{
+		DisableStartupMessage: a.cfg.DisableStartupMessage,
+	})
 }
 
-// ZAPListen serves the ZAP RPC plane on the given address. The HTTP
-// server (Fiber) keeps running on its own listener — one binary, two
-// transports.
-//
-// **STATUS**: stub. The dispatcher in zaprpc.Registry is wired and
-// callable; the on-the-wire ZAP server (binary framing, multiplexing,
-// streaming) lands in a follow-up PR once zapc-generated server types
-// stabilize. Calling ZAPListen today reserves the port, logs, and
-// returns an error so misconfigured deployments fail loud.
-func (a *App) ZAPListen(addr string) error {
-	if a.zapReg == nil || len(a.zapReg.Names()) == 0 {
-		return fmt.Errorf("zip: ZAPListen called but no ZAP services registered")
-	}
-	a.logger.Info("zip ZAP plane registered (network listener stub)",
-		"addr", addr, "services", a.zapReg.Names())
+// ListenZAP serves the fiber handler over ZAP — the PRIMARY transport. Blocks
+// until Shutdown. Every route registered on this App answers over ZAP with the
+// same middleware, auth filters, and error handling as over HTTP.
+func (a *App) ListenZAP(addr string) error {
+	a.prepare()
+	s := &zaphttp.Server{Addr: addr, Handler: a.fiber.Handler()}
+	a.zapMu.Lock()
+	a.zap = s
+	a.zapMu.Unlock()
+	a.logger.Info("zip listening ZAP", "addr", addr)
+	return s.ListenAndServe()
+}
 
-	// Reserve the port up-front so misconfigured deployments fail fast.
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("zip: ZAP listen %s: %w", addr, err)
+// Serve runs ZAP (primary) and, when httpAddr != "", HTTP (extra) concurrently,
+// returning the first listener error. The normal way to bring a zip binary up
+// on both transports.
+func (a *App) Serve(zapAddr, httpAddr string) error {
+	errc := make(chan error, 2)
+	go func() { errc <- a.ListenZAP(zapAddr) }()
+	if httpAddr != "" {
+		go func() { errc <- a.ListenHTTP(httpAddr) }()
 	}
-	a.zapListener = ln
-	a.appendCloser(func() error { return ln.Close() })
+	return <-errc
+}
 
-	// Full wire dispatch lands in follow-up PR.
-	return fmt.Errorf("zip: ZAP wire dispatch not yet implemented — registry usable via app.ZAPRegistry()")
+// closeZAP stops the ZAP listener if one is running. Called from Shutdown.
+func (a *App) closeZAP() {
+	a.zapMu.Lock()
+	s := a.zap
+	a.zapMu.Unlock()
+	if s != nil {
+		_ = s.Close()
+	}
 }

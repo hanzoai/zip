@@ -9,7 +9,7 @@
 //	app.Get("/health", func(c *zip.Ctx) error {
 //	    return c.JSON(200, fiber.Map{"ok": true})
 //	})
-//	app.Listen(":8080")
+//	app.Serve(":9653", ":8080") // ZAP primary + HTTP extra
 //
 // Public surface — types/functions exposed at the package root:
 //
@@ -25,13 +25,14 @@ package zip
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/gofiber/fiber/v3"
 	luxlog "github.com/luxfi/log"
+	zaphttp "github.com/zap-proto/http"
 
 	"github.com/hanzoai/zip/internal/jsonenc"
 	"github.com/hanzoai/zip/runtime"
-	"github.com/hanzoai/zip/zaprpc"
 )
 
 // JSONVariant reports which JSON implementation zip is using in this
@@ -41,13 +42,6 @@ import (
 // stack is "JSON only at edge, ZAP between services"; this constant
 // tells operators which JSON impl is on the edge.
 const JSONVariant = jsonenc.Variant
-
-// zaprpcRegistry is an alias so the App field doesn't carry a deep type
-// path; full type lives in package zaprpc.
-type zaprpcRegistry = zaprpc.Registry
-
-// newZAPRegistry constructs the ZAP RPC service registry.
-func newZAPRegistry() *zaprpcRegistry { return zaprpc.NewRegistry() }
 
 // Handler is zip's request handler signature. Returning an error causes
 // Fiber's error chain to write a JSON response.
@@ -114,14 +108,14 @@ type Config struct {
 // App is the zip application. It wraps *fiber.App and exposes the zip
 // handler signature alongside generic typed handlers.
 type App struct {
-	cfg         Config
-	logger      luxlog.Logger
-	loader      runtime.Loader
-	fiber       *fiber.App
-	ops         []*registeredOp
-	closers     []func() error
-	zapReg      *zaprpcRegistry
-	zapListener interface{ Close() error }
+	cfg     Config
+	logger  luxlog.Logger
+	loader  runtime.Loader
+	fiber   *fiber.App
+	ops     []*registeredOp
+	closers []func() error
+	zap     *zaphttp.Server // the ZAP (primary) listener, set by ListenZAP
+	zapMu   sync.Mutex
 }
 
 // New constructs an App with the given config. Defaults are applied
@@ -180,23 +174,16 @@ func (a *App) Fiber() *fiber.App { return a.fiber }
 // Logger returns the App's logger.
 func (a *App) Logger() luxlog.Logger { return a.logger }
 
-// Listen starts the HTTP server on addr and blocks.
-func (a *App) Listen(addr string) error {
-	a.installOpenAPIRoutes()
-	a.logger.Info("zip listening", "addr", addr)
-	return a.fiber.Listen(addr, fiber.ListenConfig{
-		DisableStartupMessage: a.cfg.DisableStartupMessage,
-	})
-}
-
-// Shutdown gracefully stops the server.
+// Shutdown gracefully stops both transports.
 func (a *App) Shutdown() error {
+	a.closeZAP()
 	_ = a.runClosers(context.Background())
 	return a.fiber.Shutdown()
 }
 
-// ShutdownWithContext gracefully stops the server bounded by ctx.
+// ShutdownWithContext gracefully stops both transports bounded by ctx.
 func (a *App) ShutdownWithContext(ctx context.Context) error {
+	a.closeZAP()
 	_ = a.runClosers(ctx)
 	return a.fiber.ShutdownWithContext(ctx)
 }

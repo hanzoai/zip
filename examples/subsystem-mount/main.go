@@ -59,5 +59,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Fatal(app.Listen(":8080"))
+	log.Fatal(app.ListenHTTP(":8080"))
 }
