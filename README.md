@@ -1,6 +1,8 @@
 # zip
 
-Hanzo's canonical Go web framework. Built on **Fiber v3 / fasthttp**.
+> **DEPRECATED — this repo is dead and unmaintained. The canonical zip is [github.com/zap-proto/zip](https://github.com/zap-proto/zip). Do not import this one. See [DEPRECATED.md](DEPRECATED.md).**
+
+A Go web framework, formerly Hanzo's. Built on **Fiber v3 / fasthttp**.
 Sinatra-style API. ZAP-typed handlers. Multi-language extension support
 via [HIP-0105](https://github.com/hanzoai/hips).
 
