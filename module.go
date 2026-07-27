@@ -1,12 +1,14 @@
 package zip
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/hanzoai/zip/internal/jsonenc"
+	"github.com/hanzoai/zip/runtime"
 )
 
 // moduleEnvelope is the JSON shape every extension runtime receives.
@@ -60,8 +62,31 @@ func (a *App) Module(methodPath, runtimeName, modulePath string) error {
 // ModuleFn is the explicit form of Module — caller specifies the
 // guest's exported function name directly.
 func (a *App) ModuleFn(method, path, fn, runtimeName, modulePath string) error {
+	mod, err := a.loadModule(runtimeName, modulePath)
+	if err != nil {
+		return err
+	}
+
+	a.logger.Info("zip mounting module",
+		"method", method, "path", path, "fn", fn,
+		"runtime", runtimeName, "modulePath", modulePath)
+
+	a.method(method, path, a.moduleHandler(mod, fn))
+
+	// Register a shutdown hook so the module's resources are released.
+	// fiber doesn't expose a graceful-shutdown hook list, so we stash the
+	// closer on the App and run them inline from Shutdown if needed.
+	a.appendCloser(mod.Close)
+	return nil
+}
+
+// loadModule resolves one extension through Config.Loader, enforcing the
+// AllowedRuntimes gate and verifying the manifest's declared runtime
+// matches what the caller asked for. Shared by Module (one route) and
+// Plugin (one subtree) so the gate lives in exactly one place.
+func (a *App) loadModule(runtimeName, modulePath string) (runtime.Module, error) {
 	if a.loader == nil {
-		return fmt.Errorf("zip: app.Module requires Config.Loader to be set")
+		return nil, fmt.Errorf("zip: mounting an extension requires Config.Loader to be set")
 	}
 	if a.cfg.AllowedRuntimes != nil {
 		ok := false
@@ -72,26 +97,29 @@ func (a *App) ModuleFn(method, path, fn, runtimeName, modulePath string) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("zip: runtime %q not in AllowedRuntimes", runtimeName)
+			return nil, fmt.Errorf("zip: runtime %q not in AllowedRuntimes", runtimeName)
 		}
 	}
 
-	mod, err := a.loader.LoadOne(nil, filepath.Clean(modulePath))
+	mod, err := a.loader.LoadOne(context.Background(), filepath.Clean(modulePath))
 	if err != nil {
-		return fmt.Errorf("zip: load module %s: %w", modulePath, err)
+		return nil, fmt.Errorf("zip: load module %s: %w", modulePath, err)
 	}
 	if got := mod.Runtime(); got != runtimeName {
 		// Loader picked a different runtime than caller asked — likely a
 		// manifest mismatch. Refuse to mount.
 		_ = mod.Close()
-		return fmt.Errorf("zip: module %s declared runtime=%q, caller passed %q", modulePath, got, runtimeName)
+		return nil, fmt.Errorf("zip: module %s declared runtime=%q, caller passed %q", modulePath, got, runtimeName)
 	}
+	return mod, nil
+}
 
-	a.logger.Info("zip mounting module",
-		"method", method, "path", path, "fn", fn,
-		"runtime", runtimeName, "modulePath", modulePath)
-
-	handler := func(c *Ctx) error {
+// moduleHandler is the request path every extension runtime shares:
+// serialize the envelope, invoke the guest export, project the response.
+// Identical for wasm / goja / pyvm / starlark / native / proc, and
+// identical whether the mount is one route or a whole subtree.
+func (a *App) moduleHandler(mod runtime.Module, fn string) Handler {
+	return func(c *Ctx) error {
 		env := buildEnvelope(c)
 		payload, err := jsonenc.Marshal(env)
 		if err != nil {
