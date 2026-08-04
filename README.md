@@ -226,4 +226,5 @@ See `docs/MIGRATION.md` for per-framework recipes.
 
 ## License
 
-Apache-2.0 (carry-forward from upstream zeekay/zip license metadata).
+MIT — see [LICENSE](./LICENSE), Copyright (c) 2025-present, Hanzo AI, Inc.
+Estate-wide licensing standard: HIP-0137 (`hanzoai/hips`).
