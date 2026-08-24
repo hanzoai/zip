@@ -12,8 +12,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/middleware"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/middleware"
 )
 
 // Deps is the typed dependency bag a unified Hanzo binary builds once

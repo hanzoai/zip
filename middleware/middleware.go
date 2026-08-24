@@ -18,7 +18,7 @@ import (
 
 	luxlog "github.com/luxfi/log"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // Recover catches handler panics and turns them into a 500 JSON response.

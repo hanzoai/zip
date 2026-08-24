@@ -1,6 +1,6 @@
 package runtime
 
-import "github.com/hanzoai/zip/internal/jsonenc"
+import "hanzo.ai/zip/internal/jsonenc"
 
 // jsonMarshal / jsonUnmarshal route through zip's jsonenc package so the
 // embedded-JS bridge uses the same JSON impl as the edge (encoding/json,

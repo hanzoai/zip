@@ -18,7 +18,7 @@ Every file from upstream has been deleted. We kept the name.
 - `examples/{hello,json,websocket}` — old examples. Replaced by 9 new
   examples covering Sinatra-style, typed handlers, OpenAPI, module
   routes, websocket, SSE, and three migration paths.
-- Module path: `zeekay.io/zip` → `github.com/hanzoai/zip`.
+- Module path: `zeekay.io/zip` → `hanzo.ai/zip`.
 
 ## What's new
 
@@ -70,5 +70,5 @@ Fiber's own `middleware/adaptor` package which is part of the v3 core.
 ## Backwards compatibility
 
 None. zeekay/zip and hanzoai/zip share only the name. The module path
-changed (`zeekay.io/zip` → `github.com/hanzoai/zip`) so go-modules
+changed (`zeekay.io/zip` → `hanzo.ai/zip`) so go-modules
 treats them as distinct packages — no transitive collision is possible.

@@ -6,7 +6,7 @@
 //
 //	import (
 //	    "github.com/beego/beego/v2/server/web"
-//	    "github.com/hanzoai/zip"
+//	    "hanzo.ai/zip"
 //	)
 //
 //	beeApp := web.NewHttpSever()  // your existing beego app
@@ -21,7 +21,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 type beegoStub struct{}

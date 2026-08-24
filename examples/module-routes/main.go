@@ -15,9 +15,9 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/middleware"
-	"github.com/hanzoai/zip/runtime"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/middleware"
+	"hanzo.ai/zip/runtime"
 )
 
 // stubLoader is a zero-dependency runtime.Loader that echoes the

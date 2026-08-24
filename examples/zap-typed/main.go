@@ -13,7 +13,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // ValidateRequest is the input type. zip derives an OpenAPI schema

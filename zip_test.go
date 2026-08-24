@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // TestBasicRouting hits the hello-world path through fiber.Test to

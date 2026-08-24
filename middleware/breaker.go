@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // BreakerState is the externally observable state of a circuit breaker.

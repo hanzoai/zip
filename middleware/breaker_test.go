@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/middleware"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/middleware"
 )
 
 // TestBreaker_OpenAfterThreshold verifies the breaker opens after N

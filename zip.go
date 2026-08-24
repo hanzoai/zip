@@ -29,9 +29,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	luxlog "github.com/luxfi/log"
 
-	"github.com/hanzoai/zip/internal/jsonenc"
-	"github.com/hanzoai/zip/runtime"
-	"github.com/hanzoai/zip/zaprpc"
+	"hanzo.ai/zip/internal/jsonenc"
+	"hanzo.ai/zip/runtime"
+	"hanzo.ai/zip/zaprpc"
 )
 
 // JSONVariant reports which JSON implementation zip is using in this

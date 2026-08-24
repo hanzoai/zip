@@ -11,7 +11,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 func main() {

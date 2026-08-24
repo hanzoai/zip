@@ -1,4 +1,4 @@
-module github.com/hanzoai/zip
+module hanzo.ai/zip
 
 go 1.26.4
 

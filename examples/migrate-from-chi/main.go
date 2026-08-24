@@ -12,8 +12,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/middleware"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/middleware"
 )
 
 // legacyHandler stands in for an existing chi.Router. Same shape

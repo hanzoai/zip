@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // chatRequest is a representative request payload — same kind of shape

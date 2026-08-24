@@ -4,7 +4,7 @@ All zip middleware is a `zip.Handler` (not raw `fiber.Handler`) so the
 user-facing handler signature stays uniform. Install via `app.Use(...)`.
 
 ```go
-import "github.com/hanzoai/zip/middleware"
+import "hanzo.ai/zip/middleware"
 
 app.Use(
     middleware.Recover(),

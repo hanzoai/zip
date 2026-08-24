@@ -7,9 +7,9 @@ package main
 import (
 	"log"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/middleware"
-	"github.com/hanzoai/zip/wsx"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/middleware"
+	"hanzo.ai/zip/wsx"
 )
 
 func main() {

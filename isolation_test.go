@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // TestTwoAppsNoStateBleed proves that two zip.App instances in the same

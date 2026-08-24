@@ -4,13 +4,13 @@ This repository is dead. It is unmaintained and must not be imported.
 
 **Canonical: [github.com/zap-proto/zip](https://github.com/zap-proto/zip)**
 
-`github.com/hanzoai/zip` was a fork. Development continued on
+`hanzo.ai/zip` was a fork. Development continued on
 `github.com/zap-proto/zip`, which is the only maintained line and is far ahead
 of anything here.
 
 ## Migrating
 
-Change the module path — `github.com/hanzoai/zip` → `github.com/zap-proto/zip`
+Change the module path — `hanzo.ai/zip` → `github.com/zap-proto/zip`
 — in `go.mod` and every import.
 
 The canonical framework builds on `github.com/zap-proto/fiber` and

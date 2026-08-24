@@ -6,7 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/hanzoai/zip/internal/jsonenc"
+	"hanzo.ai/zip/internal/jsonenc"
 )
 
 // TypedHandler is the generic handler signature: takes an *In, returns

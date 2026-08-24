@@ -12,8 +12,8 @@ via [HIP-0105](https://github.com/hanzoai/hips).
 package main
 
 import (
-    "github.com/hanzoai/zip"
-    "github.com/hanzoai/zip/middleware"
+    "hanzo.ai/zip"
+    "hanzo.ai/zip/middleware"
 )
 
 func main() {
@@ -67,10 +67,10 @@ func main() {
 ## Install
 
 ```bash
-go get github.com/hanzoai/zip
+go get hanzo.ai/zip
 ```
 
-Module path: `github.com/hanzoai/zip`. Go version: 1.26.3 (forced by
+Module path: `hanzo.ai/zip`. Go version: 1.26.3 (forced by
 luxfi/log).
 
 ## JSON: encoding/json/v2 at the edge

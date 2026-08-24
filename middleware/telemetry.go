@@ -3,7 +3,7 @@ package middleware
 import (
 	"time"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // O11ySink is the minimum interface zip's telemetry middleware consumes.

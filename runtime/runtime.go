@@ -4,7 +4,7 @@
 // and zip mounts modules as routes via app.Module().
 package runtime
 
-import internal "github.com/hanzoai/zip/internal/runtime"
+import internal "hanzo.ai/zip/internal/runtime"
 
 // Loader is re-exported from internal/runtime for ergonomic use:
 //

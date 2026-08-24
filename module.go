@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hanzoai/zip/internal/jsonenc"
+	"hanzo.ai/zip/internal/jsonenc"
 )
 
 // moduleEnvelope is the JSON shape every extension runtime receives.

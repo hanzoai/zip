@@ -7,7 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/hanzoai/zip/internal/jsonenc"
+	"hanzo.ai/zip/internal/jsonenc"
 )
 
 // OpenAPIConfig configures the auto-generated /.well-known/openapi.json

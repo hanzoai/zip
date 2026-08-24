@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/zip"
-	"github.com/hanzoai/zip/runtime"
+	"hanzo.ai/zip"
+	"hanzo.ai/zip/runtime"
 )
 
 // stubLoader is a minimal runtime.Loader fixture for tests.

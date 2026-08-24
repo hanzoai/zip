@@ -14,7 +14,7 @@ import (
 	"github.com/fasthttp/websocket"
 	"github.com/valyala/fasthttp"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // Conn is the WebSocket connection passed to wsx handlers.

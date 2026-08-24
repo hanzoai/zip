@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hanzoai/zip"
+	"hanzo.ai/zip"
 )
 
 // RateLimitConfig configures the per-key token bucket.
